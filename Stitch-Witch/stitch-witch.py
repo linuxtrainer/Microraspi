@@ -359,8 +359,9 @@ def print_values(): # print current image-values in to top-window
 
 
 def set_values(): # set values which will used for taking pictures
-    camera.awb_mode='off'
     camera.iso=100
+    #camera.exposure_mode='off'
+    camera.awb_mode='off'
     camera.awb_gains=(w1.get(),w2.get())
     camera.brightness=w4.get()
     camera.contrast=w5.get()
@@ -368,10 +369,11 @@ def set_values(): # set values which will used for taking pictures
     camera.saturation=w7.get()
     camera.sharpness=w8.get()
     sspeed=w3.get()
+    camera.drc_strength='high'
     camera.shutter_speed=sspeed # integer,microseconds, 1000000=eine Sekunde!
     fps=1000000/sspeed
-    if fps>15:
-       fps=15
+    #if fps>15:
+    #   fps=15
     camera.framerate=fps # wichtig wenn exposure_mode auf off
     print_values()
 
@@ -391,9 +393,9 @@ def set_default(): # set camera-values back to default values, as defined when p
 
 def take_picture(picfile): # take one image from still-port of camera
     camera.stop_preview()  # picfile is name of file with full path
-    camera.resolution=(2592,1944)
-    camera.exposure_mode='off'
-    camera.image_denoise=True
+    #camera.resolution=(2592,1944)
+    camera.resolution=(4056,3040)
+    #camera.image_denoise=True
     sleep(1)
     try:
        camera.capture(picfile,format='jpeg',resize=None,quality=100)
