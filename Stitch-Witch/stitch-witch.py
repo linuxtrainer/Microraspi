@@ -308,7 +308,7 @@ def mk_singlepics(withpic): # moves object half the size of image-width
                # Hier Einzelaufnahme ausloesen
                number += 1
                filename=basename+str(number)+'.jpg'
-	       sleep(2)
+               sleep(2)
                take_picture(filename)
                print 'Taken picture:',filename
             sleep(1)
@@ -317,7 +317,7 @@ def mk_singlepics(withpic): # moves object half the size of image-width
         if direction==1:
            direction=0
         else:
-	   direction=1
+           direction=1
 
 
 def mk_testpic():
@@ -360,7 +360,7 @@ def print_values(): # print current image-values in to top-window
 
 def set_values(): # set values which will used for taking pictures
     camera.iso=100
-    #camera.exposure_mode='off'
+    #camera.exposure_mode='off' #exposure_mode sollte nicht deaktiviert werden
     camera.awb_mode='off'
     camera.awb_gains=(w1.get(),w2.get())
     camera.brightness=w4.get()
@@ -393,6 +393,7 @@ def set_default(): # set camera-values back to default values, as defined when p
 
 def take_picture(picfile): # take one image from still-port of camera
     camera.stop_preview()  # picfile is name of file with full path
+    #camera.resolution=(320,240)
     #camera.resolution=(2592,1944)
     camera.resolution=(4056,3040)
     #camera.image_denoise=True
@@ -426,12 +427,29 @@ def show_picture(): # for diplaying image to the screen
 
 
 def preview_on():
-    camera.exposure_mode='auto'
-    camera.resolution=(640,480)
-    #camera.preview.alpha=200
+    camera.preview_fullscreen=False
     camera.start_preview()
-    camera.preview.fullscreen=False
-    camera.preview.window=(0,0,640,480)
+    #print "psize.get", psize.get()
+    if psize.get() == 0:
+        tkMessageBox.showerror("Preview","Groesse fuer das Vorschaufenster nicht gesetzt")
+    if psize.get() == 1:
+        #camera.exposure_mode='auto'
+        camera.resolution=(640,480)
+        #camera.preview.alpha=200
+        camera.preview_fullscreen=False
+        camera.preview_window=(0,0,640,480)
+    if psize.get() == 2:
+        #camera.exposure_mode='auto'
+        camera.resolution=(1280,960)
+        #camera.preview.alpha=200
+        camera.preview_fullscreen=False
+        camera.preview_window=(0,0,1280,960)
+    if psize.get() == 3:
+        #camera.exposure_mode='auto'
+        camera.resolution=(1800,1350)
+        #camera.preview.alpha=200
+        camera.preview_fullscreen=False
+        camera.preview_window=(0,0,1800,1350)
     global preview
     preview=True
 
@@ -442,6 +460,12 @@ def preview_off():
     preview=False
 
 
+def p_update():
+    #print "preview:",preview
+    if preview:
+          preview_on()
+          
+          
 def quit_prog():
     master.destroy()
     camera.stop_preview()
@@ -465,31 +489,32 @@ def check_signal():
 camera = picamera.PiCamera()
 master=Tk()
 #master.geometry('+640+100')
-master.geometry('+1000+5')
+master.geometry('800x1000+1000+50')
 
 objectiv=IntVar()
+psize=IntVar()
 anzahlpic=IntVar()
 
 textw=Text(master,height=2,width=114)
 textw.pack()
 
-previewframe=Frame(master)
+previewframe=Frame(master,relief='sunken',border=1)
 picframe=Frame(master)
 fixpositionframe=Frame(master,relief='groove',border=1)
 sequenceframe=Frame(master,relief='sunken',border=1)
 radioframe=Frame(master,relief='sunken',border=1)
 anzahlframe=Frame(master,relief='groove',border=1)
-closeframe=Frame(master,relief='sunken',border=1)
+psizeframe=Frame(master,relief='sunken',border=1)
 motorframe=Frame(master)
 anwendframe=Frame(master)
 
 motorframe.pack(side=TOP)
 fixpositionframe.pack(side=TOP,fill='x')
 sequenceframe.pack(side=TOP,fill='x')
-closeframe.pack(side=BOTTOM,fill='x')
-previewframe.pack(side=BOTTOM)
+psizeframe.pack(side=TOP,fill='x')
+previewframe.pack(side=BOTTOM,fill='x')
 anwendframe.pack(side=BOTTOM)
-radioframe.pack(fill='x')
+radioframe.pack(fill='x') # fuer die Objektivzuordnung
 anzahlframe.pack(fill='x')
 
 
@@ -499,7 +524,7 @@ w1.pack()
 w2=Scale(master,from_=0,to=8,resolution=0.1,length=800,orient=HORIZONTAL,border=0,label='awb blue')
 w2.set(1.0)
 w2.pack()
-w3=Scale(master,from_=10000,to=1000000,resolution=10000,length=800,orient=HORIZONTAL,border=0,label='shutter speed')
+w3=Scale(master,from_=20000,to=1000000,resolution=10000,length=800,orient=HORIZONTAL,border=0,label='shutter speed')
 w3.set(30000)
 w3.pack()
 w4=Scale(master,from_=0,to=100,length=800,orient=HORIZONTAL,border=0,label='brightness')
@@ -538,17 +563,25 @@ Button(fixpositionframe,text='Y-unten festlegen',command=lambda: fix_positions('
 Button(sequenceframe,text='Dry-run',command=lambda: mk_singlepics('off')).grid(row=0,column=0)
 Button(sequenceframe,text='Einzelaufnahmen starten',command=lambda: mk_singlepics('on')).grid(row=0,column=1)
 Button(sequenceframe,text='Goto Start',command=goto_start).grid(row=0,column=3)
-Button(anwendframe,text='Anwenden',command=set_values).pack(side=LEFT)
+Button(anwendframe,text='Aenderungen uebernehmen',command=set_values).pack(side=LEFT)
 Button(anwendframe,text='Alle Werte auf default',command=set_default).pack(side=RIGHT)
+
+Radiobutton(psizeframe,text='640x480',variable=psize,value=1,command=p_update).pack(side=LEFT,anchor=W)
+Radiobutton(psizeframe,text='1280x960',variable=psize,value=2,command=p_update).pack(side=LEFT,anchor=W)
+Radiobutton(psizeframe,text='1800x1350',variable=psize,value=3,command=p_update).pack(side=LEFT,anchor=W)
+
 Button(previewframe,text='Vorschau starten',command=preview_on).pack(side=LEFT,pady=10)
-Button(previewframe,text='Vorschau beenden',command=preview_off).pack(side=LEFT,pady=10,padx=100)
-Button(previewframe,text='Bild aufnehmen',command=mk_testpic).pack(side=RIGHT,pady=10)
-Button(previewframe,text='Bild anzeigen',command=show_picture).pack(side=RIGHT,pady=10)
+Button(previewframe,text='Bild aufnehmen',command=mk_testpic).pack(side=LEFT,pady=10)
+Button(previewframe,text='Bild anzeigen',command=show_picture).pack(side=LEFT,pady=10)
+Button(previewframe,text='Vorschau beenden',command=preview_off).pack(side=LEFT,pady=10)
+Button(previewframe,text='Programm beenden',foreground='red',command=quit_prog).pack(side=RIGHT,pady=10)
+
+
 Button(motorframe,text='>',repeatdelay=100,repeatinterval=3,command=lambda: cyclus_forward(1,1)).pack(side=RIGHT,padx=10,pady=20)
 Button(motorframe,text='<',repeatdelay=100,repeatinterval=3,command=lambda: cyclus_backward(1,1)).pack(side=LEFT,padx=10,pady=20)
 Button(motorframe,text=' /\ ',repeatdelay=100,repeatinterval=20,command=lambda: cyclus_forward(0,1)).pack(side=TOP,padx=10,pady=20)
 Button(motorframe,text='V',repeatdelay=100,repeatinterval=20,command=lambda: cyclus_backward(0,1)).pack(side=BOTTOM,padx=10,pady=20)
-Button(closeframe,text='Beenden',command=quit_prog).pack(side=RIGHT)
+
 
 
 set_default()
