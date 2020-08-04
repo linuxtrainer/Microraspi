@@ -9,6 +9,7 @@ import signal
 import sys
 from time import sleep
 import RPi.GPIO as GPIO
+from PIL import Image, ImageDraw
 
 
 global preview
@@ -53,7 +54,7 @@ initialbasename="mikro_"
 # eine vollstaendige Umdrehung Kreuztisch in rechts/Links Richtung ergibt eine Verschiebung um 2.1mm
 # fuer den Step-Motor 28BYJ-48  ergibt dies fuer einen Step 4.1 Mikrometer
 #
-# eine vollstaendige Umdrehung Kreuztisch in rauf/runter Richtung eribt eine Verschiebung um 15.8mm
+# eine vollstaendige Umdrehung Kreuztisch in rauf/runter(vor/zurueck) Richtung ergibt eine Verschiebung um 15.8mm
 # fuer den Step-Motor 28BYJ-48  ergibt dies fuer einen Step 31 Mikrometer
 #
 
@@ -122,7 +123,7 @@ def step(w1,w2,w3,w4,motor):
 
 
 def cyclus_forward(motor,walks):      # eight steps is one cyclus, 512 cyclus makes the
-    for i in range(walks): # motor do a full rotation.
+    for i in range(walks):            # motor do a full rotation.
         if motor==1:
            global xAddr
            xAddr += 1
@@ -314,6 +315,13 @@ def mk_singlepics(withpic): # moves object half the size of image-width
             sleep(1)
 
         cyclus_backward(0,ypichalf)
+        if withpic=='on': # when change the direction, image is created to mark this
+            number += 1
+            filename=basename+str(number)+'.jpg'
+            img = Image.new('RGB', (400, 100), color = (73, 109, 137))
+            d = ImageDraw.Draw(img)
+            d.text((10,10), "Richtungswechsel", fill=(255,255,0))
+            img.save(filename)
         if direction==1:
            direction=0
         else:
@@ -360,7 +368,7 @@ def print_values(): # print current image-values in to top-window
 
 def set_values(): # set values which will used for taking pictures
     camera.iso=100
-    #camera.exposure_mode='off' #exposure_mode sollte nicht deaktiviert werden
+    #camera.exposure_mode='off' #exposure_mode sollte nicht deaktiviert werden, verursacht grosse Probleme (schwarze Bilder)
     camera.awb_mode='off'
     camera.awb_gains=(w1.get(),w2.get())
     camera.brightness=w4.get()
@@ -575,7 +583,6 @@ Button(previewframe,text='Bild aufnehmen',command=mk_testpic).pack(side=LEFT,pad
 Button(previewframe,text='Bild anzeigen',command=show_picture).pack(side=LEFT,pady=10)
 Button(previewframe,text='Vorschau beenden',command=preview_off).pack(side=LEFT,pady=10)
 Button(previewframe,text='Programm beenden',foreground='red',command=quit_prog).pack(side=RIGHT,pady=10)
-
 
 Button(motorframe,text='>',repeatdelay=100,repeatinterval=3,command=lambda: cyclus_forward(1,1)).pack(side=RIGHT,padx=10,pady=20)
 Button(motorframe,text='<',repeatdelay=100,repeatinterval=3,command=lambda: cyclus_backward(1,1)).pack(side=LEFT,padx=10,pady=20)
