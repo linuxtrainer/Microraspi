@@ -31,9 +31,9 @@ global yside
 yside=None
 global xside
 xside=None
-global xpichalf
+global xpichalf # Anzahl der Steps, die fuer einen halben Bildausschnitt in x-Richtung benoetigt werden.
 xpichalf=None
-global ypichalf
+global ypichalf # Anzahl der Steps, die fuer einen halben Bildausschnitt in y-Richtung benoetigt werden.
 ypichalf=None
 global anzpic
 anzpic=None
@@ -41,6 +41,8 @@ global xAddr_mittel
 xAddr_mittel=None
 global yAddr_mittel
 yAddr_mittel=None
+global correction  # bei Richtungswechsel gibt einen einen gewissen mechanischen Spielraum, bis das
+correction=80 #110 # Praeparat wieder bewegt wird. Hier die Anzahl der Steps, die der Leerlauf verbraucht
 
 home=os.getenv("HOME")
 global initialimagedir
@@ -109,7 +111,8 @@ def step(w1,w2,w3,w4,motor):
        pinB = 27    # Number 13
        pinC = 22    # Number 15
        pinD = 4     # Number 7
-       zeit = 0.001 # motor 1 needs not a lot of power, but speed is needed
+       #zeit = 0.001 # motor 1 needs not a lot of power, but speed is needed
+       zeit = 0.002 # motor 1 needs not a lot of power, but speed is needed
 
     GPIO.output(pinA,w1)
     GPIO.output(pinB,w2)
@@ -302,6 +305,7 @@ def mk_singlepics(withpic): # moves object half the size of image-width
             if direction==0:
                cyclus_backward(1,xpichalf)
             print "direction:",direction," xside:",xside," yside:",yside,"xAddr:",xAddr,"yAddr:",yAddr
+            #sleep(5)
             check_signal
             master.protocol("WM_DELETE_WINDOW",quit_prog)
             if withpic=='on':     # when withpic is on, pitures are taken, withpic is off
@@ -309,23 +313,27 @@ def mk_singlepics(withpic): # moves object half the size of image-width
                # Hier Einzelaufnahme ausloesen
                number += 1
                filename=basename+str(number)+'.jpg'
-               sleep(2)
+               sleep(1)
                take_picture(filename)
                print 'Taken picture:',filename
             sleep(1)
 
         cyclus_backward(0,ypichalf)
-        if withpic=='on': # when change the direction, image is created to mark this
-            number += 1
-            filename=basename+str(number)+'.jpg'
-            img = Image.new('RGB', (400, 100), color = (73, 109, 137))
-            d = ImageDraw.Draw(img)
-            d.text((10,10), "Richtungswechsel", fill=(255,255,0))
-            img.save(filename)
+        # only for debug
+        #if withpic=='on': # when change the direction, image is created to mark this
+        #    number += 1
+        #    filename=basename+str(number)+'.jpg'
+        #    img = Image.new('RGB', (400, 100), color = (73, 109, 137))
+        #    d = ImageDraw.Draw(img)
+        #    d.text((10,10), "Richtungswechsel", fill=(255,255,0))
+        #    img.save(filename)
+        # Ende - only for debug
         if direction==1:
            direction=0
+           cyclus_backward(1,correction)
         else:
            direction=1
+           cyclus_forward(1,correction)
 
 
 def mk_testpic():
@@ -340,19 +348,23 @@ def set_objectiv():
     if objectiv.get() == 1:
        xpichalf=150
        ypichalf=18
-    if objectiv.get() == 2:
+    if objectiv.get() == 2: #10
        xpichalf=50
        ypichalf=6
        #xpichalf=72
        #ypichalf=8
-    if objectiv.get() == 3:
+    if objectiv.get() == 3: # 20
        #xpichalf=32
-       xpichalf=28
-       ypichalf=4
-    if objectiv.get() == 4:
+       xpichalf=40
+       ypichalf=5
+    if objectiv.get() == 4: #25
+       #xpichalf=32
+       xpichalf=32
+       ypichalf=5
+    if objectiv.get() == 5: # 30
        xpichalf=24
        ypichalf=3
-    if objectiv.get() == 5:
+    if objectiv.get() == 6: # 40
        xpichalf=24
        ypichalf=3
     print_values()
@@ -367,32 +379,32 @@ def print_values(): # print current image-values in to top-window
 
 
 def set_values(): # set values which will used for taking pictures
-    camera.iso=100
+    camera.iso=w6.get()
     #camera.exposure_mode='off' #exposure_mode sollte nicht deaktiviert werden, verursacht grosse Probleme (schwarze Bilder)
     camera.awb_mode='off'
+    sspeed=w3.get()
+    camera.shutter_speed=sspeed # integer,microseconds, 1000000=eine Sekunde!
+    fps=1000000/sspeed
+    if fps>50:
+       fps=50
+    camera.framerate=fps # wichtig wenn exposure_mode auf off
     camera.awb_gains=(w1.get(),w2.get())
     camera.brightness=w4.get()
     camera.contrast=w5.get()
-    #camera.exposure_compensation=w6.get()
+    #camera.exposure_compensation=w9.get()
     camera.saturation=w7.get()
     camera.sharpness=w8.get()
-    sspeed=w3.get()
     camera.drc_strength='high'
-    camera.shutter_speed=sspeed # integer,microseconds, 1000000=eine Sekunde!
-    fps=1000000/sspeed
-    #if fps>15:
-    #   fps=15
-    camera.framerate=fps # wichtig wenn exposure_mode auf off
     print_values()
 
 
 def set_default(): # set camera-values back to default values, as defined when programm is started
-    w1.set(1.5)    # awb red
-    w2.set(1.2)    # awb blue
+    w1.set(3.0)    # awb red
+    w2.set(1.3)    # awb blue
     w3.set(90000)  # shutter speed
     w4.set(50)     # brightness
     w5.set(0)      # contrast
-    #w6.set(0)
+    w6.set(50)     # iso
     w7.set(0)      # saturation
     w8.set(0)      # sharpness
     camera.rotation=0
@@ -497,7 +509,7 @@ def check_signal():
 camera = picamera.PiCamera()
 master=Tk()
 #master.geometry('+640+100')
-master.geometry('800x1000+1000+50')
+master.geometry('800x1030+1100+10')
 
 objectiv=IntVar()
 psize=IntVar()
@@ -532,7 +544,7 @@ w1.pack()
 w2=Scale(master,from_=0,to=8,resolution=0.1,length=800,orient=HORIZONTAL,border=0,label='awb blue')
 w2.set(1.0)
 w2.pack()
-w3=Scale(master,from_=20000,to=1000000,resolution=10000,length=800,orient=HORIZONTAL,border=0,label='shutter speed')
+w3=Scale(master,from_=20000,to=1000000,resolution=5000,length=800,orient=HORIZONTAL,border=0,label='shutter speed')
 w3.set(30000)
 w3.pack()
 w4=Scale(master,from_=0,to=100,length=800,orient=HORIZONTAL,border=0,label='brightness')
@@ -541,9 +553,12 @@ w4.pack()
 w5=Scale(master,from_=-100,to=100,length=800,orient=HORIZONTAL,border=0,label='contrast')
 w5.set(0)
 w5.pack()
-#w6=Scale(master,from_=-25,to=25,length=800,orient=HORIZONTAL,border=0,label='exposure_compensation')
-#w6.set(0)
-#w6.pack()
+#w9=Scale(master,from_=-25,to=25,length=800,orient=HORIZONTAL,border=0,label='exposure_compensation')
+#w9.set(0)
+#w9.pack()
+w6=Scale(master,from_=50,to=800,resolution=50,length=800,orient=HORIZONTAL,border=0,label='iso')
+w6.set(100)
+w6.pack()
 w7=Scale(master,from_=-100,to=100,length=800,orient=HORIZONTAL,border=0,label='saturation')
 w7.set(0)
 w7.pack()
@@ -554,8 +569,9 @@ w8.pack()
 Radiobutton(radioframe,text="Objektiv 3.5",variable=objectiv,value=1,command=set_objectiv).pack(side=LEFT,anchor=W)
 Radiobutton(radioframe,text="Objektiv 10",variable=objectiv,value=2,command=set_objectiv).pack(side=LEFT,anchor=W)
 Radiobutton(radioframe,text="Objektiv 20",variable=objectiv,value=3,command=set_objectiv).pack(side=LEFT,anchor=W)
-Radiobutton(radioframe,text="Objektiv 30",variable=objectiv,value=4,command=set_objectiv).pack(side=LEFT,anchor=W)
-Radiobutton(radioframe,text="Objektiv 40",variable=objectiv,value=5,command=set_objectiv).pack(side=LEFT,anchor=W)
+Radiobutton(radioframe,text="Objektiv 25",variable=objectiv,value=4,command=set_objectiv).pack(side=LEFT,anchor=W)
+Radiobutton(radioframe,text="Objektiv 30",variable=objectiv,value=5,command=set_objectiv).pack(side=LEFT,anchor=W)
+Radiobutton(radioframe,text="Objektiv 40",variable=objectiv,value=6,command=set_objectiv).pack(side=LEFT,anchor=W)
 
 Radiobutton(anzahlframe,text="50",variable=anzahlpic,value=1,command=set_anzahlpic).pack(side=LEFT,anchor=W)
 Radiobutton(anzahlframe,text="100",variable=anzahlpic,value=2,command=set_anzahlpic).pack(side=LEFT,anchor=W)

@@ -56,10 +56,10 @@ def print_values(): # print current image-values in to top-window
 
 def take_picture(picfile): #Grundfunktion zur Einzelbildaufnahme
     camera.stop_preview()
-    camera.resolution=(2592,1944)
-    camera.exposure_mode='off'
-    camera.image_denoise=False
+    camera.resolution=(4056,3040)
+    #camera.image_denoise=False
     sleep(1)
+    camera.exposure_mode='off'
     try:
         #camera.capture(picfile,format='jpeg',resize=None,quality=100)
         camera.capture(picfile,format='jpeg',resize=None,bayer=True)
@@ -160,18 +160,18 @@ def start_hdr(): # func that ask all the things befor activating the hdr-calcula
     hdrfilenames=[]
     values=set_values()
     if not speeds:
-        speeds,speedssec=def_exposures()
+        speeds=def_exposures()
     if (len(speeds)!=amounthdrpics.get()):
-	speeds,speedssec=def_exposures()
+        speeds=def_exposures()
     if (len(speeds)!=len(hdrflatfilenames)):
-	hdrflatfilenames=[]
+        hdrflatfilenames=[]
     print "Active Values for the picamera:",values
     preview_on()
     tkMessageBox.showinfo("Information","Suchen Sie nun einen geeigenten Ausschnitt fuer die HDR-Aufnahmen und druecken Sie erst dann OK!")
     preview_off()
     basename=tkFileDialog.asksaveasfilename(initialdir=initialimagedir,initialfile=initialbasename)
     if basename:
-        hdrfilenames=mk_exposures(speeds,basename)
+        hdrfilenames,speedssec=mk_exposures(speeds,basename)
         result=tkMessageBox.askyesno("Flatfield","Wollen Sie die HDR-Aufnahmen mit (ja) oder ohne (nein) Flatfieldkorrektur?")
         if result==True:
             if hdrflatfilenames:
@@ -189,7 +189,7 @@ def start_hdr(): # func that ask all the things befor activating the hdr-calcula
                 preview_off()
                 flatname=initialimagedir+"/"+initialflatname
                 if flatname:
-                    hdrflatfilenames=mk_exposures(speeds,flatname)
+                    hdrflatfilenames,speedssec=mk_exposures(speeds,flatname)
                 else:
                     tkMessageBox.showwarning("Warning","Flatfield-Erstellung vom Benutzer abgebrochen!")
                     print "Warning - flatfield-creation canceld by user!"
@@ -206,54 +206,59 @@ def start_hdr(): # func that ask all the things befor activating the hdr-calcula
     else:
         tkMessageBox.showwarning("Warning","Keine HDR-Aufnahmen erstellt!")#Frage nach Dateiname wurde abgebrochen
 
-def def_exposures(): # erzeugt 5,6 oder 7 Belichtungswerte
+def def_exposures(): # erzeugt 5,6 oder 7 Belichtungswerte und befuellt Array damit
     speeds=[]
-    speedssec=[]
     hdrpics=amounthdrpics.get()
     center=camera.shutter_speed
     print "Anzahl HDR-Aufnahmen:",hdrpics
     if hdrpics==5:
-	denominator=4
+        denominator=4
     if hdrpics==6:
-	denominator=6
+        denominator=6
     if hdrpics==7:
-	denominator=7
+        denominator=7
     if hdrpics==8:
-	denominator=8
+        denominator=8
     first=center/denominator
-    first=first/2
+    #first=first/2
     if denominator==4:
-	denominator=5
+        denominator=5
     for steps in range(0,denominator):
         speeds.append(first)
-        speedssec.append(first/1000000.0)
         first=first+first
+        #first=first+first+first
     print "speeds:", speeds
-    print "speedssec", speedssec
-    return speeds, speedssec
+    return speeds # die errechneten Belichtungswerte werden aber nicht so umgesetzt.
 
-def mk_exposures(speeds,basename):#erzeugt unterschiedliche belichtete Aufnahmen
-    camera.stop_preview()
-    camera.exposure_mode='off'
-    camera.resolution=(2592,1944)
-    camera.image_denoise=False
-    camera.iso=100
+def mk_exposures(speeds,basename):#erzeugt unterschiedlich belichtete Aufnahmen
+    speedssec=[]
     filenames=[]
-    for speed in speeds: 
-        picfile=basename+str(speed)+'.jpg'
+    camera.stop_preview()
+    camera.resolution=(4056,3040)
+    set_values()
+    sleep(1)
+    #camera.image_denoise=False
+    #camera.iso=100
+    for speed in speeds:
         camera.shutter_speed=speed
+        #camera.exposure_mode='auto'
         fps=1000000/speed
-        if fps>30:
-            fps=30 
+        if fps>50:
+            fps=50
         camera.framerate=fps
-        sleep(1)
+        #sleep(0.5)
+        values={"iso":camera.iso,"brightness":camera.brightness,"contrast":camera.contrast,"saturation":camera.saturation,"sharpness":camera.sharpness,"shutter_speed":camera.shutter_speed,"exposure_speed":camera.exposure_speed,"framerate":camera.framerate}
+        print "mk_exposures:", values
+        #camera.exposure_mode='off'
+        picfile=basename+str(camera.shutter_speed)+'.jpg'
         try:
             camera.capture(picfile,format='jpeg',resize=None,quality=100)
+            speedssec.append(camera.shutter_speed/1000000.0)
             filenames.append(picfile)
             print "Erfolg:",picfile," erzeugt"
         except:
             tkMessageBox.showerror("create file","Error create file: %s" % picfile)
-    return filenames 
+    return filenames, speedssec 
 
 def bake_hdr(flatokay,hdrfilenames,hdrflatfilenames,basename,speedssec): # Erzeugt aus den 5,6 oder 7 unterschiedlich belichteten Aufnahmen eine Tonmapping-Aufnahme
     if flatokay==True:
@@ -310,32 +315,33 @@ def calc_withflat(flatpic,picfile): # fuehrt die Flatfield-Korrektur aus
        tkMessageBox.showerror("flatfile","Problem mit Flatfield-Correction: %s/%s" % flatpic % picfile)
        
 def set_values(): # set values which will used for taking pictures
-    camera.awb_mode='off'
     camera.iso=w9.get()
+    camera.awb_mode='off'
+    sspeed=w3.get()
+    camera.shutter_speed=sspeed # integer,microseconds, 1000000=eine Sekunde!
+#    camera.exposure_speed=sspeed
+    fps=1000000/sspeed
+    if fps>50:
+       fps=50
+    camera.framerate=fps # wichtig wenn exposure_mode auf off
     camera.awb_gains=(w1.get(),w2.get())
     camera.brightness=w4.get()
     camera.contrast=w5.get()
     camera.exposure_compensation=w6.get()
     camera.saturation=w7.get()
     camera.sharpness=w8.get()
-    sspeed=w3.get()
-    camera.shutter_speed=sspeed # integer,microseconds, 1000000=eine Sekunde!
-#    camera.exposure_speed=sspeed
     if greycolors.get():
-    	camera.color_effects=(128,128)
+        camera.color_effects=(128,128)
     else:
-	camera.color_effects=None
-    fps=1000000/sspeed
-    if fps>15:
-       fps=15
-    camera.framerate=fps # wichtig wenn exposure_mode auf off
+        camera.color_effects=None
+    #camera.exposure_mode='off'
     values={"iso":camera.iso,"brightness":camera.brightness,"contrast":camera.contrast,"saturation":camera.saturation,"sharpness":camera.sharpness,"shutter_speed":sspeed,"framerate":camera.framerate}
     print_values()
     print values
     return values
 
 def set_default(): # set camera-values back to default values, as defined when programm is started
-    w1.set(1.5)    # awb red 
+    w1.set(3.0)    # awb red 
     w2.set(1.2)    # awb blue
     w3.set(90000)  # shutter speed
     w4.set(50)     # brightness
@@ -343,7 +349,7 @@ def set_default(): # set camera-values back to default values, as defined when p
     w6.set(0)      # exposure_compensation
     w7.set(0)      # saturation
     w8.set(0)      # sharpness
-    w9.set(100)    # camera.iso
+    w9.set(50)    # camera.iso
     amounthdrpics.set(5)
     camera.color_effects=None
     camera.rotation=0
@@ -418,7 +424,7 @@ w7.pack()
 w8=Scale(master,from_=-100,to=100,length=580,orient=HORIZONTAL,border=0,label='sharpness')
 w8.set(0)
 w8.pack()
-w9=Scale(master,from_=100,to=800,resolution=100,length=580,orient=HORIZONTAL,border=0,label='iso')
+w9=Scale(master,from_=50,to=800,resolution=50,length=580,orient=HORIZONTAL,border=0,label='iso')
 w9.set(0)
 w9.pack()
 
