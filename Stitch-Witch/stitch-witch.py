@@ -1,14 +1,13 @@
 from Tkinter import *
 import tkMessageBox
 import tkFileDialog
-from PIL import Image
 import picamera
+import RPi.GPIO as GPIO
 import os
 import math
 import signal
 import sys
 from time import sleep
-import RPi.GPIO as GPIO
 from PIL import Image, ImageDraw
 
 
@@ -41,8 +40,8 @@ global xAddr_mittel
 xAddr_mittel=None
 global yAddr_mittel
 yAddr_mittel=None
-global correction  # bei Richtungswechsel gibt einen einen gewissen mechanischen Spielraum, bis das
-correction=80 #110 # Praeparat wieder bewegt wird. Hier die Anzahl der Steps, die der Leerlauf verbraucht
+global correction  # bei Richtungswechsel in x-Richtung gibt einen einen gewissen mechanischen Spielraum, bis das
+correction=80 #110 # Praeparat wieder bewegt wird. Hier die Anzahl der Steps, die dieser Leerlauf verbraucht
 
 home=os.getenv("HOME")
 global initialimagedir
@@ -211,7 +210,9 @@ def set_anzahlpic():
     if anzahlpic.get() == 5:
         anzpic=700
         print "Anzahl Bilder: ",anzpic
-
+    if anzahlpic.get() == 6:
+        anzpic=800
+        print "Anzahl Bilder: ",anzpic
 
 def calc_quadrat():
     global anzpic
@@ -223,11 +224,14 @@ def calc_quadrat():
     global X2point
     global Y1point
     global Y2point
+    xt2y=31/4.0  # ein Step in x-Richtung sind 4 Mikrometer, ein Step in y-Richtung sind 31 Mikrometer beim Biolam MPN
     numberpic=int(round(math.sqrt(anzpic)))
     X2point=int(-(numberpic/2*xpichalf)+xAddr_mittel)
     X1point=int((numberpic/2*xpichalf)+xAddr_mittel)
-    Y1point=int(-(numberpic/2*ypichalf)+yAddr_mittel)
-    Y2point=int((numberpic/2*ypichalf)+yAddr_mittel)
+    #Y1point=int(-(numberpic/2*ypichalf)+yAddr_mittel)
+    #Y2point=int((numberpic/2*ypichalf)+yAddr_mittel)
+    Y1point=int(-((numberpic/2*xpichalf)/xt2y)+yAddr_mittel)
+    Y2point=int(((numberpic/2*xpichalf)/xt2y)+yAddr_mittel)
 
 
 def calc_window():
@@ -236,7 +240,7 @@ def calc_window():
     global xside
     global yside
     if xpichalf==None or ypichalf==None:
-       tkMessageBox.showerror("Objektiv","Noch kein Objektiv definiert. Bitte Objektiv auswaehlen.")
+       tkMessageBox.showerror("xy-Steps","Keine Werte fuer die Weiterueckung definiert. Step in xy-Richtung bitte setzen!")
        return 1
     if anzpic != None and xAddr_mittel != None and yAddr_mittel != None:
        calc_quadrat();
@@ -285,7 +289,7 @@ def goto_start():
 
 def mk_singlepics(withpic): # moves object half the size of image-width
     if xpichalf==None or ypichalf==None:
-       tkMessageBox.showerror("Objektiv","Noch kein Objektiv definiert. Bitte Objektiv auswaehlen.")
+       tkMessageBox.showerror("xy-Steps","Keine Werte fuer die Weiterueckung definiert. Steps fuer xy-Richtung bitte setzen!")
        return 1
     retval=goto_start()
     print "retval von goto_start: ",retval
@@ -297,7 +301,7 @@ def mk_singlepics(withpic): # moves object half the size of image-width
        #preview_off()
        number=1
        basename=tkFileDialog.asksaveasfilename(initialdir=initialimagedir,initialfile=initialbasename)
-
+    values2file()
     for y in range(0,yside,ypichalf):    # always move size of half picture
         for x in range(0,xside,xpichalf):# then take picture
             if direction==1:
@@ -342,32 +346,50 @@ def mk_testpic():
     take_picture(filename)
 
 
-def set_objectiv():
+#def set_objectiv():
+#    global xpichalf
+#    global ypichalf
+#    if objectiv.get() == 1:
+#       xpichalf=150
+#       ypichalf=18
+#    if objectiv.get() == 2: #10
+#       xpichalf=50
+#       ypichalf=6
+#       #xpichalf=72
+#       #ypichalf=8
+#    if objectiv.get() == 3: # 20
+#       #xpichalf=32
+#       xpichalf=40
+#       ypichalf=5
+#    if objectiv.get() == 4: #25
+#       #xpichalf=32
+#       xpichalf=22
+#       ypichalf=3
+#    if objectiv.get() == 5: # 30
+#       xpichalf=24
+#       ypichalf=3
+#    if objectiv.get() == 6: # 40
+#       xpichalf=24
+#       ypichalf=3
+#    print_values()
+    
+    
+def set_xypichalf():
     global xpichalf
     global ypichalf
-    if objectiv.get() == 1:
-       xpichalf=150
-       ypichalf=18
-    if objectiv.get() == 2: #10
-       xpichalf=50
-       ypichalf=6
-       #xpichalf=72
-       #ypichalf=8
-    if objectiv.get() == 3: # 20
-       #xpichalf=32
-       xpichalf=40
-       ypichalf=5
-    if objectiv.get() == 4: #25
-       #xpichalf=32
-       xpichalf=32
-       ypichalf=5
-    if objectiv.get() == 5: # 30
-       xpichalf=24
-       ypichalf=3
-    if objectiv.get() == 6: # 40
-       xpichalf=24
-       ypichalf=3
-    print_values()
+    xpichalf=int(xwert.get())
+    ypichalf=int(ywert.get())
+    if xpichalf<0 or ypichalf<0 or ypichalf>xpichalf:
+        tkMessageBox.showerror("xy-Steps","Keine gueltigen Werte fuer die Weiterueckung definiert.")
+        xpichalf='None'
+        ypichalf='None'
+        return 1
+    if xpichalf=="" or ypichalf=="":
+        tkMessageBox.showerror("xy-Steps","Keine gueltigen Werte fuer die Weiterueckung definiert.")
+        xpichalf='None'
+        ypichalf='None'
+        return 1
+    print "Gesetzt: Steps in x-Richtung:", xpichalf, "Steps in y-Richtung:",ypichalf
 
 
 def print_values(): # print current image-values in to top-window
@@ -399,14 +421,14 @@ def set_values(): # set values which will used for taking pictures
 
 
 def set_default(): # set camera-values back to default values, as defined when programm is started
-    w1.set(3.0)    # awb red
+    w1.set(3.4)    # awb red
     w2.set(1.3)    # awb blue
-    w3.set(90000)  # shutter speed
+    w3.set(80000)  # shutter speed
     w4.set(50)     # brightness
-    w5.set(0)      # contrast
+    w5.set(5)      # contrast
     w6.set(50)     # iso
     w7.set(0)      # saturation
-    w8.set(0)      # sharpness
+    w8.set(50)      # sharpness
     camera.rotation=0
     set_values()
 
@@ -418,6 +440,7 @@ def take_picture(picfile): # take one image from still-port of camera
     camera.resolution=(4056,3040)
     #camera.image_denoise=True
     sleep(1)
+    #camera.exposure_mode='off'
     try:
        camera.capture(picfile,format='jpeg',resize=None,quality=100)
        #camera.capture(picfile,format='jpeg',resize=None,quality=100,bayer=True)
@@ -474,6 +497,19 @@ def preview_on():
     preview=True
 
 
+def values2file():
+     #print 'shutter_speed:', camera.shutter_speed, 'fps:', camera.framerate, 'contrast:', camera.contrast
+     #print 'exposure_compensation:', camera.exposure_compensation, 'brightness:', camera.brightness, 'awb_gains (red/blue):', camera.awb_gains
+     #print 'saturation:', camera.saturation, 'sharpness:', camera.sharpness, 'xpichalf:', xpichalf, 'ypichalf:', ypichalf
+     datei=open(initialimagedir + '/' + 'verwendeteWerte.txt','w')
+     datei.write('shutter_speed:'+str(camera.shutter_speed)+'\n'+'exposure_speed:'+str(camera.exposure_speed)+'\n'+'fps:'+str(camera.framerate)+'\n')
+     datei.write('contrast:'+str(camera.contrast)+'\n'+'fps:'+str(camera.framerate)+'\n'+'exposure_compensation:'+str(camera.exposure_compensation)+'\n')
+     datei.write('brightness:'+str(camera.brightness)+'\n'+'awb_gains (red/blue):'+str(camera.awb_gains)+'\n')
+     datei.write('iso:'+str(camera.iso)+'\n')
+     datei.write('saturation:'+str(camera.saturation)+'\n'+'sharpness:'+str(camera.sharpness)+'\n'+'xpichalf:'+str(xpichalf)+'\n'+'ypichalf:'+str(ypichalf)+'\n')
+     datei.close()
+
+
 def preview_off():
     camera.stop_preview()
     global preview
@@ -522,7 +558,8 @@ previewframe=Frame(master,relief='sunken',border=1)
 picframe=Frame(master)
 fixpositionframe=Frame(master,relief='groove',border=1)
 sequenceframe=Frame(master,relief='sunken',border=1)
-radioframe=Frame(master,relief='sunken',border=1)
+#radioframe=Frame(master,relief='sunken',border=1)
+eingabeframe=Frame(master,relief='groove',border=1)
 anzahlframe=Frame(master,relief='groove',border=1)
 psizeframe=Frame(master,relief='sunken',border=1)
 motorframe=Frame(master)
@@ -534,8 +571,9 @@ sequenceframe.pack(side=TOP,fill='x')
 psizeframe.pack(side=TOP,fill='x')
 previewframe.pack(side=BOTTOM,fill='x')
 anwendframe.pack(side=BOTTOM)
-radioframe.pack(fill='x') # fuer die Objektivzuordnung
+#radioframe.pack(fill='x') # fuer die Objektivzuordnung
 anzahlframe.pack(fill='x')
+eingabeframe.pack(fill='x')
 
 
 w1=Scale(master,from_=0,to=8,resolution=0.1,length=800,orient=HORIZONTAL,border=0,label='awb red')
@@ -566,19 +604,28 @@ w8=Scale(master,from_=-100,to=100,length=800,orient=HORIZONTAL,border=0,label='s
 w8.set(0)
 w8.pack()
 
-Radiobutton(radioframe,text="Objektiv 3.5",variable=objectiv,value=1,command=set_objectiv).pack(side=LEFT,anchor=W)
-Radiobutton(radioframe,text="Objektiv 10",variable=objectiv,value=2,command=set_objectiv).pack(side=LEFT,anchor=W)
-Radiobutton(radioframe,text="Objektiv 20",variable=objectiv,value=3,command=set_objectiv).pack(side=LEFT,anchor=W)
-Radiobutton(radioframe,text="Objektiv 25",variable=objectiv,value=4,command=set_objectiv).pack(side=LEFT,anchor=W)
-Radiobutton(radioframe,text="Objektiv 30",variable=objectiv,value=5,command=set_objectiv).pack(side=LEFT,anchor=W)
-Radiobutton(radioframe,text="Objektiv 40",variable=objectiv,value=6,command=set_objectiv).pack(side=LEFT,anchor=W)
+#Radiobutton(radioframe,text="Objektiv 3.5",variable=objectiv,value=1,command=set_objectiv).pack(side=LEFT,anchor=W)
+#Radiobutton(radioframe,text="Objektiv 10",variable=objectiv,value=2,command=set_objectiv).pack(side=LEFT,anchor=W)
+#Radiobutton(radioframe,text="Objektiv 20",variable=objectiv,value=3,command=set_objectiv).pack(side=LEFT,anchor=W)
+#Radiobutton(radioframe,text="Objektiv 25",variable=objectiv,value=4,command=set_objectiv).pack(side=LEFT,anchor=W)
+#Radiobutton(radioframe,text="Objektiv 30",variable=objectiv,value=5,command=set_objectiv).pack(side=LEFT,anchor=W)
+#Radiobutton(radioframe,text="Objektiv 40",variable=objectiv,value=6,command=set_objectiv).pack(side=LEFT,anchor=W)
+
+Label(eingabeframe, text="Steps in x-Richtung:").grid(row=0,column=0)
+xwert=Entry(eingabeframe)
+xwert.grid(row=0,column=1)
+Label(eingabeframe, text="Steps in y-Richtung:").grid(row=0,column=2)
+ywert=Entry(eingabeframe)
+ywert.grid(row=0,column=3)
+Button(eingabeframe, text='Eingabewerte setzen', command=set_xypichalf).grid(row=0, column=4, sticky=W, pady=4)
 
 Radiobutton(anzahlframe,text="50",variable=anzahlpic,value=1,command=set_anzahlpic).pack(side=LEFT,anchor=W)
 Radiobutton(anzahlframe,text="100",variable=anzahlpic,value=2,command=set_anzahlpic).pack(side=LEFT,anchor=W)
 Radiobutton(anzahlframe,text="300",variable=anzahlpic,value=3,command=set_anzahlpic).pack(side=LEFT,anchor=W)
 Radiobutton(anzahlframe,text="500",variable=anzahlpic,value=4,command=set_anzahlpic).pack(side=LEFT,anchor=W)
 Radiobutton(anzahlframe,text="700",variable=anzahlpic,value=5,command=set_anzahlpic).pack(side=LEFT,anchor=W)
-Button(anzahlframe,text='Quadratmittelpunk festlegen',command=fix_mittelpunkt).pack(side=RIGHT,padx=10,pady=20)
+Radiobutton(anzahlframe,text="800",variable=anzahlpic,value=5,command=set_anzahlpic).pack(side=LEFT,anchor=W)
+Button(anzahlframe,text='Quadratmittelpunk festlegen',command=fix_mittelpunkt).pack(side=RIGHT,padx=10,pady=10)
 
 Button(fixpositionframe,text='X-rechts festlegen',command=lambda: fix_positions('Xrechts')).pack(side=RIGHT,padx=10,pady=20)
 Button(fixpositionframe,text='X-links festlegen',command=lambda: fix_positions('Xlinks')).pack(side=LEFT,padx=10,pady=20)
@@ -590,9 +637,9 @@ Button(sequenceframe,text='Goto Start',command=goto_start).grid(row=0,column=3)
 Button(anwendframe,text='Aenderungen uebernehmen',command=set_values).pack(side=LEFT)
 Button(anwendframe,text='Alle Werte auf default',command=set_default).pack(side=RIGHT)
 
-Radiobutton(psizeframe,text='640x480',variable=psize,value=1,command=p_update).pack(side=LEFT,anchor=W)
-Radiobutton(psizeframe,text='1280x960',variable=psize,value=2,command=p_update).pack(side=LEFT,anchor=W)
 Radiobutton(psizeframe,text='1800x1350',variable=psize,value=3,command=p_update).pack(side=LEFT,anchor=W)
+Radiobutton(psizeframe,text='1280x960',variable=psize,value=2,command=p_update).pack(side=LEFT,anchor=W)
+Radiobutton(psizeframe,text='640x480',variable=psize,value=1,command=p_update).pack(side=LEFT,anchor=W)
 
 Button(previewframe,text='Vorschau starten',command=preview_on).pack(side=LEFT,pady=10)
 Button(previewframe,text='Bild aufnehmen',command=mk_testpic).pack(side=LEFT,pady=10)
