@@ -213,7 +213,13 @@ def set_anzahlpic():
     if anzahlpic.get() == 6:
         anzpic=800
         print "Anzahl Bilder: ",anzpic
-
+    if anzahlpic.get() == 7:
+        anzpic=900
+        print "Anzahl Bilder: ",anzpic
+    if anzahlpic.get() == 8:
+        anzpic=1000
+        print "Anzahl Bilder: ",anzpic    
+        
 def calc_quadrat():
     global anzpic
     global xAddr_mittel
@@ -317,10 +323,10 @@ def mk_singlepics(withpic): # moves object half the size of image-width
                # Hier Einzelaufnahme ausloesen
                number += 1
                filename=basename+str(number)+'.jpg'
-               sleep(1)
+               #sleep(1)
                take_picture(filename)
                print 'Taken picture:',filename
-            sleep(1)
+            #sleep(1)
 
         cyclus_backward(0,ypichalf)
         # only for debug
@@ -439,7 +445,8 @@ def take_picture(picfile): # take one image from still-port of camera
     #camera.resolution=(2592,1944)
     camera.resolution=(4056,3040)
     #camera.image_denoise=True
-    sleep(1)
+    #sleep(1)
+    sleep(0.5)
     #camera.exposure_mode='off'
     try:
        camera.capture(picfile,format='jpeg',resize=None,quality=100)
@@ -624,7 +631,9 @@ Radiobutton(anzahlframe,text="100",variable=anzahlpic,value=2,command=set_anzahl
 Radiobutton(anzahlframe,text="300",variable=anzahlpic,value=3,command=set_anzahlpic).pack(side=LEFT,anchor=W)
 Radiobutton(anzahlframe,text="500",variable=anzahlpic,value=4,command=set_anzahlpic).pack(side=LEFT,anchor=W)
 Radiobutton(anzahlframe,text="700",variable=anzahlpic,value=5,command=set_anzahlpic).pack(side=LEFT,anchor=W)
-Radiobutton(anzahlframe,text="800",variable=anzahlpic,value=5,command=set_anzahlpic).pack(side=LEFT,anchor=W)
+Radiobutton(anzahlframe,text="800",variable=anzahlpic,value=6,command=set_anzahlpic).pack(side=LEFT,anchor=W)
+Radiobutton(anzahlframe,text="900",variable=anzahlpic,value=7,command=set_anzahlpic).pack(side=LEFT,anchor=W)
+Radiobutton(anzahlframe,text="1000",variable=anzahlpic,value=8,command=set_anzahlpic).pack(side=LEFT,anchor=W)
 Button(anzahlframe,text='Quadratmittelpunk festlegen',command=fix_mittelpunkt).pack(side=RIGHT,padx=10,pady=10)
 
 Button(fixpositionframe,text='X-rechts festlegen',command=lambda: fix_positions('Xrechts')).pack(side=RIGHT,padx=10,pady=20)
