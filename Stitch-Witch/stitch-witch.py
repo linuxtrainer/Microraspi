@@ -1,7 +1,7 @@
 from Tkinter import *
 import tkMessageBox
 import tkFileDialog
-import picamera
+from picamera import PiCamera
 import RPi.GPIO as GPIO
 import os
 import math
@@ -41,7 +41,7 @@ xAddr_mittel=None
 global yAddr_mittel
 yAddr_mittel=None
 global correction  # bei Richtungswechsel in x-Richtung gibt einen einen gewissen mechanischen Spielraum, bis das
-correction=80 #110 # Praeparat wieder bewegt wird. Hier die Anzahl der Steps, die dieser Leerlauf verbraucht
+correction=55 #80 #110 # Praeparat wieder bewegt wird. Hier die Anzahl der Steps, die dieser Leerlauf verbraucht
 
 home=os.getenv("HOME")
 global initialimagedir
@@ -315,7 +315,7 @@ def mk_singlepics(withpic): # moves object half the size of image-width
             if direction==0:
                cyclus_backward(1,xpichalf)
             print "direction:",direction," xside:",xside," yside:",yside,"xAddr:",xAddr,"yAddr:",yAddr
-            #sleep(5)
+            sleep(1)
             check_signal
             master.protocol("WM_DELETE_WINDOW",quit_prog)
             if withpic=='on':     # when withpic is on, pitures are taken, withpic is off
@@ -326,7 +326,7 @@ def mk_singlepics(withpic): # moves object half the size of image-width
                #sleep(1)
                take_picture(filename)
                print 'Taken picture:',filename
-            #sleep(1)
+            sleep(0.5)
 
         cyclus_backward(0,ypichalf)
         # only for debug
@@ -399,59 +399,72 @@ def set_xypichalf():
 
 
 def print_values(): # print current image-values in to top-window
-    textw.delete('1.0','2.114') # zurst alles loeschen von Position 1.0 bis 2.114 (Zeile/Spalte)
+    textw.delete('1.0','3.114') # zurst alles loeschen von Position 1.0 bis 2.114 (Zeile/Spalte)
     textw.insert('1.0','exposure_speed:'+str(camera.exposure_speed)+'|'+'shutter_speed:'+str(camera.shutter_speed)+'|'
     +'fps:'+str(camera.framerate)+'|'+'contrast:'+str(camera.contrast)+'|'+'exposure_compensation:'+str(camera.exposure_compensation)+'|'
     +'brightness:'+str(camera.brightness)+'|'+'awb_gains (red/blue):'+str(camera.awb_gains)+'|'+'saturation:'+str(camera.saturation)+'|'
-    +'sharpness:'+str(camera.sharpness)+'|'+'xpichalf:'+str(xpichalf)+'|'+'ypichalf:'+str(ypichalf))
+    +'sharpness:'+str(camera.sharpness)+'|'+'xpichalf:'+str(xpichalf)+'|'+'ypichalf:'+str(ypichalf)+'|'+'analoggain:'+str(camera.analog_gain)+'|'
+    +'exposure_mode:'+str(camera.exposure_mode))
 
 
 def set_values(): # set values which will used for taking pictures
+    camera.resolution=(4056,3040)
     camera.iso=w6.get()
-    #camera.exposure_mode='off' #exposure_mode sollte nicht deaktiviert werden, verursacht grosse Probleme (schwarze Bilder)
-    camera.awb_mode='off'
+    print("analog_gain=%1.2f" % camera.analog_gain)
+    sleep(2)
     sspeed=w3.get()
     camera.shutter_speed=sspeed # integer,microseconds, 1000000=eine Sekunde!
-    fps=1000000/sspeed
-    if fps>50:
-       fps=50
-    camera.framerate=fps # wichtig wenn exposure_mode auf off
+    camera.exposure_mode='off'
+    camera.awb_mode='off'
     camera.awb_gains=(w1.get(),w2.get())
+    fps=1000000.0/sspeed
+    if fps>40:
+        fps=40
+    camera.framerate=math.floor(fps) # wichtig wenn exposure_mode auf off
     camera.brightness=w4.get()
     camera.contrast=w5.get()
     #camera.exposure_compensation=w9.get()
     camera.saturation=w7.get()
     camera.sharpness=w8.get()
-    camera.drc_strength='high'
+    camera.rotation=0
+    #camera.drc_strength='high'
     print_values()
 
 
 def set_default(): # set camera-values back to default values, as defined when programm is started
     w1.set(3.4)    # awb red
-    w2.set(1.3)    # awb blue
-    w3.set(80000)  # shutter speed
+    w2.set(1.4)    # awb blue
+    w3.set(30000)  # shutter speed
     w4.set(50)     # brightness
     w5.set(5)      # contrast
-    w6.set(50)     # iso
+    w6.set(100)    # iso
     w7.set(0)      # saturation
-    w8.set(50)      # sharpness
-    camera.rotation=0
+    w8.set(50)     # sharpness
     set_values()
 
 
 def take_picture(picfile): # take one image from still-port of camera
     camera.stop_preview()  # picfile is name of file with full path
-    #camera.resolution=(320,240)
-    #camera.resolution=(2592,1944)
-    camera.resolution=(4056,3040)
-    #camera.image_denoise=True
-    #sleep(1)
-    sleep(0.5)
-    #camera.exposure_mode='off'
     try:
-       camera.capture(picfile,format='jpeg',resize=None,quality=100)
+       set_values()
+       camera.capture(picfile,format='jpeg',resize=None,quality=100,thumbnail=None)
+       sleep(1)
+       file_size=os.path.getsize(picfile)
        #camera.capture(picfile,format='jpeg',resize=None,quality=100,bayer=True)
        #tkMessageBox.showinfo("Create file","Image %s successful created!" % picfile)
+       count=0
+       while file_size <= 200000: # dark images is created, try it again
+           count=count+1
+           print 'Filesize of image: ', picfile, ' is: ', file_size
+           print 'count: ', count
+           if count==3:
+                   print ("No Success in getting good image - break")
+                   break
+           camera.exposure_mode='auto'
+           sleep(2)
+           camera.capture(picfile,format='jpeg',resize=None,quality=100,thumbnail=None)
+           print 'Bild ', picfile, ' wurde NOCHMALS erzeugt.'
+           file_size=os.path.getsize(picfile)
        print_values()
        if preview:
           preview_on()
@@ -483,21 +496,15 @@ def preview_on():
     if psize.get() == 0:
         tkMessageBox.showerror("Preview","Groesse fuer das Vorschaufenster nicht gesetzt")
     if psize.get() == 1:
-        #camera.exposure_mode='auto'
         camera.resolution=(640,480)
-        #camera.preview.alpha=200
         camera.preview_fullscreen=False
         camera.preview_window=(0,0,640,480)
     if psize.get() == 2:
-        #camera.exposure_mode='auto'
         camera.resolution=(1280,960)
-        #camera.preview.alpha=200
         camera.preview_fullscreen=False
         camera.preview_window=(0,0,1280,960)
     if psize.get() == 3:
-        #camera.exposure_mode='auto'
         camera.resolution=(1800,1350)
-        #camera.preview.alpha=200
         camera.preview_fullscreen=False
         camera.preview_window=(0,0,1800,1350)
     global preview
@@ -549,7 +556,8 @@ def check_signal():
     signal.signal(signal.SIGTERM,receive_signal)
 
 
-camera = picamera.PiCamera()
+#camera = picamera.PiCamera()
+camera = PiCamera(resolution=(4056, 3040), framerate=12)
 master=Tk()
 #master.geometry('+640+100')
 master.geometry('800x1030+1100+10')
@@ -558,7 +566,7 @@ objectiv=IntVar()
 psize=IntVar()
 anzahlpic=IntVar()
 
-textw=Text(master,height=2,width=114)
+textw=Text(master,height=3,width=114)
 textw.pack()
 
 previewframe=Frame(master,relief='sunken',border=1)
@@ -589,7 +597,7 @@ w1.pack()
 w2=Scale(master,from_=0,to=8,resolution=0.1,length=800,orient=HORIZONTAL,border=0,label='awb blue')
 w2.set(1.0)
 w2.pack()
-w3=Scale(master,from_=20000,to=1000000,resolution=5000,length=800,orient=HORIZONTAL,border=0,label='shutter speed')
+w3=Scale(master,from_=2000,to=100000,resolution=1000,length=800,orient=HORIZONTAL,border=0,label='shutter speed')
 w3.set(30000)
 w3.pack()
 w4=Scale(master,from_=0,to=100,length=800,orient=HORIZONTAL,border=0,label='brightness')
@@ -661,14 +669,10 @@ Button(motorframe,text='<',repeatdelay=100,repeatinterval=3,command=lambda: cycl
 Button(motorframe,text=' /\ ',repeatdelay=100,repeatinterval=20,command=lambda: cyclus_forward(0,1)).pack(side=TOP,padx=10,pady=20)
 Button(motorframe,text='V',repeatdelay=100,repeatinterval=20,command=lambda: cyclus_backward(0,1)).pack(side=BOTTOM,padx=10,pady=20)
 
-
-
 set_default()
-set_values()
 master.protocol("WM_DELETE_WINDOW",quit_prog)
 
 mainloop()
-
 
 GPIO.cleanup()
 camera.close()
